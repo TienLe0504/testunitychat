@@ -10,7 +10,7 @@ namespace SimpleGameClient
         // 🌐 PUBLIC SERVER CONFIGURATIONS
         private static readonly string[] SERVER_OPTIONS = {
             "http://localhost:3000",                    // Local development
-            "https://your-app-name.herokuapp.com",      // Heroku
+            "https://YOUR_HEROKU_APP_NAME.herokuapp.com", // Heroku - REPLACE WITH YOUR APP NAME
             "https://your-app-name.railway.app",        // Railway  
             "https://your-app-name.onrender.com",       // Render
             "https://xxxxx.ngrok.io"                    // ngrok (temporary)
