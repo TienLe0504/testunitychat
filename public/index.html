@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>1v1 Matchmaking Test Client</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f0f0f0;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .player-info {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .status {
+            background: #fff3e0;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            border-left: 4px solid #ff9800;
+        }
+        .chat-area {
+            background: #f5f5f5;
+            height: 200px;
+            overflow-y: auto;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .chat-message {
+            margin: 5px 0;
+            padding: 5px;
+            background: white;
+            border-radius: 3px;
+        }
+        .my-message {
+            background: #e8f5e8;
+            text-align: right;
+        }
+        .opponent-message {
+            background: #fff3e0;
+        }
+        .system-message {
+            background: #e3f2fd;
+            font-style: italic;
+            text-align: center;
+        }
+        button {
+            background: #2196f3;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #1976d2;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        input[type="text"] {
+            width: 70%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+        }
+        .connected {
+            color: green;
+        }
+        .disconnected {
+            color: red;
+        }
+        .waiting {
+            color: orange;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎮 1v1 Matchmaking Test Client</h1>
+        
+        <div class="player-info">
+            <h3>Your Info</h3>
+            <input type="text" id="playerName" placeholder="Enter your name" value="">
+            <button onclick="connect()">Connect to Server</button>
+            <button onclick="disconnect()" disabled id="disconnectBtn">Disconnect</button>
+            <p>Status: <span id="connectionStatus" class="disconnected">Disconnected</span></p>
+            <p>Player ID: <span id="playerId">Not assigned</span></p>
+        </div>
+
+        <div class="status">
+            <h3>Match Status</h3>
+            <p id="matchStatus">Not searching</p>
+            <button onclick="findMatch()" disabled id="findMatchBtn">Find Match</button>
+            <button onclick="leaveQueue()" disabled id="leaveQueueBtn">Leave Queue</button>
+        </div>
+
+        <div class="player-info" id="opponentInfo" style="display: none;">
+            <h3>Opponent Info</h3>
+            <p>Name: <span id="opponentName">-</span></p>
+            <p>Player ID: <span id="opponentId">-</span></p>
+            <p>IP: <span id="opponentIP">-</span></p>
+            <p>Port: <span id="opponentPort">-</span></p>
+            <p>P2P Status: <span id="p2pStatus">Not connected</span></p>
+        </div>
+
+        <div id="chatSection" style="display: none;">
+            <h3>Chat Test (Simulating P2P Communication)</h3>
+            <div class="chat-area" id="chatArea"></div>
+            <input type="text" id="chatInput" placeholder="Type a message..." onkeypress="if(event.key==='Enter') sendMessage()">
+            <button onclick="sendMessage()">Send</button>
+            <button onclick="simulateP2PMessage()">Simulate P2P Test</button>
+        </div>
+
+        <div class="status">
+            <h3>Server Stats</h3>
+            <p>Queue: <span id="queueCount">-</span></p>
+            <p>Active Matches: <span id="activeMatches">-</span></p>
+            <button onclick="refreshStats()">Refresh Stats</button>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        let socket = null;
+        let isConnected = false;
+        let isInMatch = false;
+        let matchInfo = null;
+        let opponentInfo = null;
+        let myInfo = null;
+
+        // Generate random player name
+        document.getElementById('playerName').value = 'Player_' + Math.floor(Math.random() * 9999);
+
+        function connect() {
+            const playerName = document.getElementById('playerName').value.trim();
+            if (!playerName) {
+                alert('Please enter a player name!');
+                return;
+            }
+
+            socket = io();
+            
+            socket.on('connect', () => {
+                isConnected = true;
+                updateUI();
+                addChatMessage('system', '🟢 Connected to server');
+                
+                myInfo = {
+                    playerId: socket.id,
+                    playerName: playerName
+                };
+                
+                document.getElementById('playerId').textContent = socket.id;
+                
+                // Start getting stats
+                refreshStats();
+                setInterval(refreshStats, 5000);
+            });
+
+            socket.on('disconnect', () => {
+                isConnected = false;
+                isInMatch = false;
+                updateUI();
+                addChatMessage('system', '🔴 Disconnected from server');
+            });
+
+            // Matchmaking events
+            socket.on('queueStatus', (data) => {
+                document.getElementById('matchStatus').textContent = 
+                    `${data.message} (Position: ${data.position})`;
+            });
+
+            socket.on('matchFound', (data) => {
+                matchInfo = data;
+                document.getElementById('matchStatus').textContent = 
+                    `Match found! Opponent: ${data.opponent.playerName} (${data.yourRole})`;
+                addChatMessage('system', `🎮 Match found! vs ${data.opponent.playerName}`);
+                
+                // Simulate getting IP info (normally from STUN)
+                setTimeout(() => {
+                    const fakeIP = '192.168.1.' + Math.floor(Math.random() * 254 + 1);
+                    const fakePort = Math.floor(Math.random() * 50000 + 10000);
+                    
+                    socket.emit('connectionInfo', {
+                        ip: fakeIP,
+                        port: fakePort
+                    });
+                    
+                    addChatMessage('system', `📡 Sent connection info: ${fakeIP}:${fakePort}`);
+                }, 1000);
+            });
+
+            socket.on('requestConnectionInfo', () => {
+                addChatMessage('system', '📡 Server requesting connection info...');
+            });
+
+            socket.on('startP2P', (data) => {
+                isInMatch = true;
+                opponentInfo = data.opponent;
+                myInfo = data.yourInfo;
+                
+                // Update opponent info
+                document.getElementById('opponentName').textContent = data.opponent.playerName;
+                document.getElementById('opponentId').textContent = data.opponent.playerId;
+                document.getElementById('opponentIP').textContent = data.opponent.ip;
+                document.getElementById('opponentPort').textContent = data.opponent.port;
+                document.getElementById('p2pStatus').textContent = '🟢 Ready for P2P';
+                
+                updateUI();
+                addChatMessage('system', `🚀 P2P connection ready! You can now chat with ${data.opponent.playerName}`);
+                addChatMessage('system', `🔗 Opponent: ${data.opponent.ip}:${data.opponent.port}`);
+                
+                // Simulate P2P connection established
+                setTimeout(() => {
+                    addChatMessage('system', '✅ P2P connection established! Chat is now working.');
+                }, 2000);
+            });
+
+            socket.on('opponentDisconnected', (data) => {
+                isInMatch = false;
+                updateUI();
+                addChatMessage('system', '❌ Opponent disconnected');
+            });
+
+            // Chat simulation events
+            socket.on('p2pMessage', (data) => {
+                addChatMessage('opponent', `${data.senderName}: ${data.message}`);
+            });
+        }
+
+        function disconnect() {
+            if (socket) {
+                socket.disconnect();
+                socket = null;
+            }
+        }
+
+        function findMatch() {
+            if (!socket || !isConnected) return;
+            
+            socket.emit('findMatch', {
+                playerId: myInfo.playerId,
+                playerName: myInfo.playerName
+            });
+            
+            document.getElementById('matchStatus').textContent = 'Searching for match...';
+            addChatMessage('system', '🔍 Searching for opponent...');
+        }
+
+        function leaveQueue() {
+            if (!socket) return;
+            
+            socket.emit('leaveQueue');
+            document.getElementById('matchStatus').textContent = 'Not searching';
+            addChatMessage('system', '❌ Left queue');
+        }
+
+        function sendMessage() {
+            const input = document.getElementById('chatInput');
+            const message = input.value.trim();
+            
+            if (!message || !isInMatch) return;
+            
+            // Add to local chat
+            addChatMessage('me', `You: ${message}`);
+            
+            // Simulate sending via P2P (in real scenario, this would be UDP)
+            // For testing, we'll send through server
+            socket.emit('p2pMessage', {
+                targetPlayerId: opponentInfo.playerId,
+                message: message,
+                senderName: myInfo.playerName
+            });
+            
+            input.value = '';
+        }
+
+        function simulateP2PMessage() {
+            if (!isInMatch) return;
+            
+            const testMessages = [
+                'Hello from P2P!',
+                'This is a test message',
+                'P2P communication working!',
+                'Ready to play?',
+                'Good game!'
+            ];
+            
+            const randomMessage = testMessages[Math.floor(Math.random() * testMessages.length)];
+            
+            // Simulate receiving a message from opponent
+            setTimeout(() => {
+                addChatMessage('opponent', `${opponentInfo.playerName}: ${randomMessage}`);
+            }, 500);
+        }
+
+        function addChatMessage(type, message) {
+            const chatArea = document.getElementById('chatArea');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `chat-message ${type}-message`;
+            messageDiv.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            
+            chatArea.appendChild(messageDiv);
+            chatArea.scrollTop = chatArea.scrollHeight;
+        }
+
+        function refreshStats() {
+            fetch('/api/stats')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('queueCount').textContent = data.queue;
+                    document.getElementById('activeMatches').textContent = data.activeMatches;
+                })
+                .catch(err => {
+                    console.error('Failed to fetch stats:', err);
+                });
+        }
+
+        function updateUI() {
+            // Update connection status
+            const statusElement = document.getElementById('connectionStatus');
+            if (isConnected) {
+                statusElement.textContent = 'Connected';
+                statusElement.className = 'connected';
+            } else {
+                statusElement.textContent = 'Disconnected';
+                statusElement.className = 'disconnected';
+            }
+
+            // Update buttons
+            document.getElementById('disconnectBtn').disabled = !isConnected;
+            document.getElementById('findMatchBtn').disabled = !isConnected || isInMatch;
+            document.getElementById('leaveQueueBtn').disabled = !isConnected || isInMatch;
+
+            // Show/hide sections
+            document.getElementById('opponentInfo').style.display = isInMatch ? 'block' : 'none';
+            document.getElementById('chatSection').style.display = isInMatch ? 'block' : 'none';
+        }
+
+        // Add P2P message handling
+        if (socket) {
+            socket.on('p2pMessage', (data) => {
+                addChatMessage('opponent', `${data.senderName}: ${data.message}`);
+            });
+        }
+    </script>
+</body>
+</html>
