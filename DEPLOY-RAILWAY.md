@@ -1,22 +1,27 @@
 # 🚂 Deploy với Railway (Đơn giản hơn Heroku)
 
-## Bước 1: Tạo GitHub Repository
-1. Vào https://github.com và tạo repository mới
-2. Upload code của bạn lên GitHub
+⚠️ **Railway trial đã hết!** Dùng các alternatives MIỄN PHÍ:
 
-## Bước 2: Deploy với Railway
-1. Vào https://railway.app
-2. Đăng nhập bằng GitHub
-3. Click "New Project" 
-4. Chọn "Deploy from GitHub repo"
-5. Chọn repository vừa tạo
-6. Railway sẽ tự động deploy!
+## 🆓 MIỄN PHÍ Alternative 1: Render (Recommended)
+1. Vào https://render.com 
+2. Đăng nhập GitHub
+3. "New" → "Web Service"
+4. Connect GitHub repo: `testunitychat`
+5. Build Command: `npm install`
+6. Start Command: `npm start`
+7. Deploy FREE!
 
-## Bước 3: Lấy URL
-- Sau khi deploy xong, copy URL từ Railway dashboard
-- URL sẽ có dạng: https://your-app.railway.app
+## 🆓 MIỄN PHÍ Alternative 2: Vercel
+1. Vào https://vercel.com
+2. Import GitHub repo
+3. Tự động deploy!
 
-## Hoặc dùng ngrok (Test nhanh):
+## 🆓 MIỄN PHÍ Alternative 3: Glitch  
+1. Vào https://glitch.com
+2. Import from GitHub
+3. Instant hosting!
+
+## ⚡ Test NGAY với ngrok (Không cần đăng ký):
 ```bash
 # Terminal 1: Start server
 node server.js
